@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
 
 	// "os"
 	"strings"
@@ -30,23 +29,24 @@ func extractVMCURL(txt string) string {
 	return ""
 }
 
-func ProbeVMC(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger *slog.Logger) error {
-	baseDomain := "exoscale.com"
-	bimiDomain := "default._bimi." + baseDomain
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: 5 * time.Second,
-			}
-			return d.DialContext(ctx, network, "8.8.8.8:53")
-		},
+func ProbeVMC(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger *slog.Logger) bool {
+	bimiDomain := "default._bimi." + target
+	resolver := net.DefaultResolver
+	if module.VMC.ResolverAddr != "" {
+		resolver = &net.Resolver{
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 5 * time.Second,
+				}
+				return d.DialContext(ctx, network, module.VMC.ResolverAddr)
+			},
+		}
 	}
 
 	txtRecords, err := resolver.LookupTXT(ctx, bimiDomain)
 	if err != nil {
 		fmt.Printf("Error looking up TXT record for %s: %v\n", bimiDomain, err)
-		return err
+		return false
 	}
 
 	found := false
@@ -70,15 +70,5 @@ func ProbeVMC(ctx context.Context, target string, module config.Module, registry
 		fmt.Println("No valid BIMI record found.")
 	}
 
-	return nil
-}
-
-func ProbeVMCWrapper(ctx context.Context, target string, module config.Module, registry *prometheus.Registry) bool {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
-	err := ProbeVMC(ctx, target, module, registry, logger)
-	if err != nil {
-		fmt.Printf("ProbeVMC failed: %v\n", err)
-		return false
-	}
 	return true
 }

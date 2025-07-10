@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"net"
 	"net/textproto"
 	"os"
 	"regexp"
@@ -357,7 +356,7 @@ type DNSProbe struct {
 }
 
 type VMCProbe struct {
-	Resolver net.Addr
+	ResolverAddr string
 }
 
 type DNSRRValidator struct {
